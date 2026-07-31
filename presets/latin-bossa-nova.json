@@ -1,0 +1,14 @@
+{
+  "id": "latin-bossa-nova",
+  "name": "Bossa Nova",
+  "genre": "latin",
+  "bpm": 128,
+  "timeSigIndex": 2,
+  "swing": 0,
+  "lanes": [
+    { "voice": "clap", "k": 5, "n": 16, "rotation": 3 },
+    { "voice": "kick", "k": 2, "n": 8, "rotation": 0 },
+    { "voice": "closedHat", "k": 8, "n": 8, "rotation": 0 },
+    { "voice": "hiConga", "k": 3, "n": 8, "rotation": 0 }
+  ]
+}

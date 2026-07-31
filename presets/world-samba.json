@@ -1,0 +1,14 @@
+{
+  "id": "world-samba",
+  "name": "Samba",
+  "genre": "world",
+  "bpm": 100,
+  "timeSigIndex": 2,
+  "swing": 0,
+  "lanes": [
+    { "voice": "kick", "k": 4, "n": 16, "rotation": 0 },
+    { "voice": "clap", "k": 7, "n": 16, "rotation": 0 },
+    { "voice": "closedHat", "k": 8, "n": 16, "rotation": 0 },
+    { "voice": "hiConga", "k": 9, "n": 16, "rotation": 0 }
+  ]
+}

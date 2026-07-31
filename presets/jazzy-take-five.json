@@ -1,0 +1,13 @@
+{
+  "id": "jazzy-take-five",
+  "name": "Take Five (5/4)",
+  "genre": "jazzy",
+  "bpm": 168,
+  "timeSigIndex": 3,
+  "swing": 0,
+  "lanes": [
+    { "voice": "ride", "k": 5, "n": 5, "rotation": 0 },
+    { "voice": "kick", "k": 2, "n": 5, "rotation": 0 },
+    { "voice": "snare", "k": 1, "n": 5, "rotation": 3 }
+  ]
+}

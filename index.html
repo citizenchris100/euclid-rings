@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Euclid Rings</title>
+<meta name="description" content="Generate euclidean-rhythm MIDI drum loops on a circular sequencer. Offline.">
+<meta name="theme-color" content="#15171c">
+
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Euclid Rings">
+
+<link rel="stylesheet" href="./theme.css">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="apphead">
+      <h1>Euclid Rings</h1>
+      <div class="headbtns">
+        <button class="btn" id="presetsBtn">Presets</button>
+        <button class="btn primary" id="exportBtn">Export .mid</button>
+      </div>
+    </header>
+
+    <div class="status" id="status" hidden></div>
+
+    <main class="layout">
+      <section class="stage">
+        <div class="ringwrap">
+          <svg id="rings" class="rings" aria-label="Euclidean ring sequencer"></svg>
+          <div id="hub" class="hub-readout"></div>
+        </div>
+      </section>
+      <aside class="controls" id="controls"></aside>
+    </main>
+
+    <div class="overlay" id="overlay" hidden></div>
+  </div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

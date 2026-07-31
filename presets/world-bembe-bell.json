@@ -1,0 +1,14 @@
+{
+  "id": "world-bembe-bell",
+  "name": "Bembe Bell",
+  "genre": "world",
+  "bpm": 120,
+  "timeSigIndex": 2,
+  "swing": 0,
+  "lanes": [
+    { "voice": "ride", "k": 7, "n": 12, "rotation": 0 },
+    { "voice": "hiConga", "k": 5, "n": 12, "rotation": 0 },
+    { "voice": "kick", "k": 3, "n": 12, "rotation": 0 },
+    { "voice": "clap", "k": 2, "n": 12, "rotation": 0 }
+  ]
+}

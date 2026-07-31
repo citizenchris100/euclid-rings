@@ -1,0 +1,13 @@
+{
+  "id": "rock-four-on-the-floor",
+  "name": "Four on the Floor",
+  "genre": "rock",
+  "bpm": 120,
+  "timeSigIndex": 2,
+  "swing": 0,
+  "lanes": [
+    { "voice": "kick", "k": 4, "n": 8, "rotation": 0 },
+    { "voice": "snare", "k": 2, "n": 8, "rotation": 2 },
+    { "voice": "closedHat", "k": 8, "n": 8, "rotation": 0 }
+  ]
+}

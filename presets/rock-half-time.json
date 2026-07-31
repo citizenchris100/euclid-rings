@@ -1,0 +1,13 @@
+{
+  "id": "rock-half-time",
+  "name": "Half-Time Stomp",
+  "genre": "rock",
+  "bpm": 92,
+  "timeSigIndex": 2,
+  "swing": 0,
+  "lanes": [
+    { "voice": "kick", "k": 2, "n": 8, "rotation": 0 },
+    { "voice": "snare", "k": 1, "n": 8, "rotation": 4 },
+    { "voice": "closedHat", "k": 8, "n": 8, "rotation": 0 }
+  ]
+}

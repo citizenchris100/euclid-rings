@@ -1,0 +1,13 @@
+{
+  "id": "ballad-slow-six-eight",
+  "name": "Slow 6/8",
+  "genre": "ballad",
+  "bpm": 66,
+  "timeSigIndex": 5,
+  "swing": 0,
+  "lanes": [
+    { "voice": "kick", "k": 2, "n": 6, "rotation": 0 },
+    { "voice": "snare", "k": 1, "n": 6, "rotation": 3 },
+    { "voice": "closedHat", "k": 6, "n": 6, "rotation": 0 }
+  ]
+}

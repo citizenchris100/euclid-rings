@@ -1,0 +1,135 @@
+// js/player.js — IMPURE lightweight lookahead player. This is the app's own scheduler (the reused
+// drumMachine.js is hard-locked to a 16-step grid and cannot place euclidean onsets at i/n of the
+// bar). It loads Kit 4 via the reused loadKit, holds one persistent GainNode per lane (the mute/
+// solo/gain gate), and fires one AudioBufferSource per hit:
+//
+//   BufferSource -> hitGain(velocity) -> laneGain[i] -> master -> destination   (mono)
+//
+// Timing is a Chris-Wilson lookahead over patternSchedule() sorted by swung `frac`; every hit time
+// is absolute off a single startAt, so it never drifts and the loop seam never skips/dupes. Voice
+// and per-hit velocity are read LIVE from the pattern, so changing a voice/gain needs no reschedule
+// (updateMix); only position-changing edits rebuild the schedule (setPattern -> restart while playing).
+
+import { loadKit } from './engine/drumKits.js';
+import { patternSchedule, cycleSeconds, MAX_LANES } from './patternModel.js';
+import { velocityFor } from './exportModel.js';
+import { soloActive } from './laneModel.js';
+
+const LOOKAHEAD_MS = 25;
+const SCHEDULE_AHEAD = 0.12;
+const LEAD = 0.06;
+
+export function createPlayer() {
+  let ctx = null, buffers = {}, master = null;
+  const laneGains = [];
+  let pattern = null, schedule = [], cyc = 1;
+  let running = false, timer = null;
+  let startAt = 0, cycleIndex = 0, cursor = 0;
+  let onFire = null;
+
+  async function init() {
+    if (ctx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC();
+    master = ctx.createGain();
+    master.gain.value = 1;
+    master.connect(ctx.destination);
+    for (let i = 0; i < MAX_LANES; i++) {
+      const g = ctx.createGain();
+      g.gain.value = 1;
+      g.connect(master);
+      laneGains.push(g);
+    }
+    buffers = await loadKit(ctx, 'kit4');
+  }
+
+  function setOnFire(cb) { onFire = cb; }
+
+  // Fold mute/solo/gain-scale onto the persistent lane gains (instant, no reschedule).
+  function updateMix(p) {
+    pattern = p;
+    if (!ctx) return;
+    const lanes = p.lanes || [];
+    const active = soloActive(lanes);
+    for (let i = 0; i < MAX_LANES; i++) {
+      const lane = lanes[i];
+      const audible = !!(lane && active[i] && !lane.mute);
+      laneGains[i].gain.setTargetAtTime(audible ? 1 : 0, ctx.currentTime, 0.01);
+    }
+  }
+
+  // Rebuild the schedule (positions changed). Restart the seam if playing.
+  function setPattern(p) {
+    pattern = p;
+    schedule = patternSchedule(p);
+    cyc = Math.max(0.05, cycleSeconds(p));
+    updateMix(p);
+    if (running) restart();
+  }
+
+  function scheduleHit(e, when) {
+    const lane = pattern.lanes[e.laneIndex];
+    if (!lane) return;
+    const buf = buffers[lane.voice];
+    if (buf) {
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const g = ctx.createGain();
+      g.gain.value = velocityFor(lane, e.accented) / 127;
+      src.connect(g);
+      g.connect(laneGains[e.laneIndex] || master);
+      src.start(when);
+    }
+    if (onFire) {
+      const delayMs = Math.max(0, (when - ctx.currentTime) * 1000);
+      setTimeout(() => { if (running) onFire(e.laneIndex, e.ringIndex); }, delayMs);
+    }
+  }
+
+  function loop() {
+    if (!running) return;
+    if (schedule.length === 0) { timer = setTimeout(loop, LOOKAHEAD_MS); return; }
+    for (;;) {
+      if (cursor >= schedule.length) { cycleIndex++; cursor = 0; }
+      const e = schedule[cursor];
+      const t = startAt + cycleIndex * cyc + e.frac * cyc;
+      if (t >= ctx.currentTime + SCHEDULE_AHEAD) break;
+      scheduleHit(e, t);
+      cursor++;
+    }
+    timer = setTimeout(loop, LOOKAHEAD_MS);
+  }
+
+  function restart() {
+    if (timer) { clearTimeout(timer); timer = null; }
+    startAt = ctx.currentTime + LEAD;
+    cycleIndex = 0;
+    cursor = 0;
+    loop();
+  }
+
+  async function play() {
+    await init();
+    if (ctx.state === 'suspended') await ctx.resume();
+    if (pattern) { schedule = patternSchedule(pattern); cyc = Math.max(0.05, cycleSeconds(pattern)); updateMix(pattern); }
+    running = true;
+    restart();
+  }
+
+  function stop() {
+    running = false;
+    if (timer) { clearTimeout(timer); timer = null; }
+  }
+
+  function isPlaying() { return running; }
+
+  // 0..1 position within the current revolution (linear; the playhead sweeps at constant speed).
+  function getCyclePhase() {
+    if (!running || !ctx) return 0;
+    const el = ctx.currentTime - startAt;
+    if (el < 0) return 0;
+    return (el / cyc) % 1;
+  }
+
+  return { init, setOnFire, setPattern, updateMix, play, stop, isPlaying, getCyclePhase };
+}

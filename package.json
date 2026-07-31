@@ -1,0 +1,10 @@
+{
+  "name": "euclid-rings",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Euclid Rings — offline PWA that generates euclidean-rhythm MIDI drum loops (Kit 4). No build step; native ES modules.",
+  "scripts": {
+    "test": "node engine.test.js"
+  }
+}
