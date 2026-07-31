@@ -3,6 +3,11 @@
  * to match the sibling PWAs. */
 
 * { box-sizing: border-box; }
+/* The `hidden` attribute must always win. Author `display` rules (e.g. `.overlay`
+ * below sets display:flex) otherwise override the UA sheet's [hidden]{display:none}
+ * — author beats UA regardless of specificity — leaving a "hidden" full-screen
+ * overlay painted on top that silently swallows every click and dims the app. */
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; }
 body {
   background: var(--bg);

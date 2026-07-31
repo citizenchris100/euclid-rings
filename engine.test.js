@@ -160,15 +160,20 @@ eq('2.14 validate rejects k>n', validateGenerator({ type: 'euclidean', params: {
 eq('2.15 validate rejects non-integer n', validateGenerator({ type: 'euclidean', params: { k: 3, n: 8.5, rotation: 0 } }).ok, false);
 eq('2.16 normalize == clamp', normalizeGenerator({ type: 'euclidean', params: { k: 3, n: 8, rotation: 0 } }), clampGenerator({ type: 'euclidean', params: { k: 3, n: 8, rotation: 0 } }));
 
-// Pluggability: registering a second type in-test proves the seam without touching the module.
+// Pluggability: a type registered at runtime must be honoured by clamp/validate/dispatch — the seam
+// consults the LIVE registry, not a load-time snapshot. Use a DISCRIMINATING generator (onset only
+// at 0) so a regression that coerced it to euclidean (which would fire [0,1,2,3] for n=4) is caught.
 {
   const savedTypes = GENERATOR_TYPES.slice();
-  REGISTRY.allOnLocalTest = ({ n }) => new Array(n).fill(true);
-  ok('2.17 a new type can be registered at runtime', Object.keys(REGISTRY).includes('allOnLocalTest'));
-  eq('2.18 the new type dispatches',
-    onsetIndices(generatorRing({ type: 'allOnLocalTest', params: { n: 4 } })), [0, 1, 2, 3]);
-  delete REGISTRY.allOnLocalTest;   // leave the registry as the module shipped it
-  eq('2.19 euclidean remained the shipped default type', savedTypes, ['euclidean']);
+  REGISTRY.pulseFirst = ({ n }) => { const a = new Array(n > 0 ? n : 0).fill(false); if (n > 0) a[0] = true; return a; };
+  ok('2.17 a new type can be registered at runtime', Object.keys(REGISTRY).includes('pulseFirst'));
+  eq('2.18 dispatch honours the runtime type (not coerced to euclidean)',
+    onsetIndices(generatorRing({ type: 'pulseFirst', params: { n: 4 } })), [0]);
+  eq('2.18b validate accepts the runtime type', validateGenerator({ type: 'pulseFirst', params: {} }).ok, true);
+  eq('2.18c clamp preserves the runtime type', clampGenerator({ type: 'pulseFirst', params: { n: 4 } }).type, 'pulseFirst');
+  delete REGISTRY.pulseFirst;   // leave the registry as the module shipped it
+  eq('2.19 removed type is rejected + coerced again', [validateGenerator({ type: 'pulseFirst', params: {} }).ok, clampGenerator({ type: 'pulseFirst' }).type], [false, 'euclidean']);
+  eq('2.19b euclidean remained the shipped default type', savedTypes, ['euclidean']);
 }
 
 // ============================================================================
@@ -361,6 +366,19 @@ ok('5.2 all 12 export notes are distinct', new Set(Object.values(EXPORT_NOTE)).s
 
 eq('5.19 exportFileName sanitizes', exportFileName({ bpm: 128 }, 'Latin — Bossa!'), 'euclid_latin-bossa_128bpm.mid');
 
+// Compound-meter tempo: the exported bar must last exactly as long as the PLAYED bar for EVERY
+// meter. barSeconds treats bpm as the per-beat pulse, so a fixed 60e6/bpm made every /8 meter export
+// at HALF its played length; exportSpec now derives the tempo from cycleSeconds so they agree.
+{
+  for (const [tsi, bpm] of [[2, 120], [5, 66], [4, 100], [7, 120], [13, 90]]) {
+    const pat = normalizePattern({ bpm, timeSigIndex: tsi, lanes: [{ voice: 'kick', generator: { type: 'euclidean', params: { k: 2, n: 6, rotation: 0 } } }] });
+    const spec = exportSpec(pat);
+    const exportedSec = (spec.endTick / SESSION_PPQ) * (spec.tempoUsPerQuarter / 1e6);
+    approx(`5.20 exported bar duration == played bar (tsi ${tsi})`, exportedSec, cycleSeconds(pat), 2e-3);
+  }
+  eq('5.21 4/4 @120 tempo unchanged (500000us)', exportSpec(normalizePattern({ bpm: 120, timeSigIndex: 2, lanes: [] })).tempoUsPerQuarter, 500000);
+}
+
 // ============================================================================
 // 6. presetModel.js + the bundled preset catalog. Every presets/<id>.json must
 //    validate, expand, and export end-to-end (the "validate every content file"
@@ -421,6 +439,87 @@ ok('6.14 jazzy swung-ride preset keeps its swing', presetToPattern(loadPreset('j
   for (const m of modules) ok(`7.1 sw.js ASSETS lists ${m}`, swSrc.includes(`"${m}"`));
   for (const id of presetIds) ok(`7.2 sw.js ASSETS lists preset ${id}`, swSrc.includes(`"./presets/${id}.json"`));
   ok('7.3 sw.js ASSETS lists the preset index', swSrc.includes('"./presets/index.json"'));
+}
+
+// ============================================================================
+// 8. Click-safety of `hidden`-toggled elements. index.html boots #status and
+//    #overlay with the `hidden` attribute; main.js shows/hides them by flipping
+//    `.hidden`. But an author rule like `.overlay { display: flex }` OVERRIDES
+//    the UA sheet's `[hidden] { display:none }` (author beats UA regardless of
+//    specificity), so the "hidden" overlay stays painted as a fixed, full-screen,
+//    z-index:20 layer that swallows every click and dims the app. This tripwire
+//    asserts every hidden-by-default element is actually kept display:none.
+// ============================================================================
+{
+  const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
+  const cssRaw = readFileSync(new URL('./styles.css', import.meta.url), 'utf8');
+  const css = cssRaw.replace(/\/\*[\s\S]*?\*\//g, '');           // strip comments
+  const esc = (s) => s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+
+  // Elements index.html renders with a bare `hidden` attribute -> boot hidden.
+  const hiddenEls = [];
+  for (const m of html.matchAll(/<[a-zA-Z][^>]*>/g)) {
+    const tag = m[0];
+    if (!/\shidden(\s|>|\/|=)/.test(tag)) continue;
+    const cls = (tag.match(/class\s*=\s*"([^"]*)"/) || [, ''])[1].trim();
+    const id = (tag.match(/id\s*=\s*"([^"]*)"/) || [, null])[1];
+    hiddenEls.push({ id, classes: cls ? cls.split(/\s+/) : [] });
+  }
+  ok('8.1 index.html has hidden-by-default elements', hiddenEls.length >= 1);
+
+  // A global `[hidden] { display:none }` guard covers every such element at once.
+  const globalGuard = /(^|[}{;,])\s*\[hidden\][^{}]*\{[^}]*display\s*:\s*none/i.test(css);
+  // Does a class rule set `display` to a NON-none value (the hazard)?
+  const classHazard = (cls) => {
+    const re = new RegExp('\\.' + esc(cls) + '\\s*\\{([^}]*)\\}', 'g');
+    let m, bad = false;
+    while ((m = re.exec(css))) {
+      const dm = m[1].match(/display\s*:\s*([a-z-]+)/i);
+      if (dm && dm[1].toLowerCase() !== 'none') bad = true;
+    }
+    return bad;
+  };
+  // A per-class `.<cls>[hidden]{display:none}` guard also suffices.
+  const classGuard = (cls) => new RegExp('\\.' + esc(cls) + '\\[hidden\\]\\s*\\{[^}]*display\\s*:\\s*none', 'i').test(css);
+
+  for (const el of hiddenEls) {
+    for (const cls of el.classes) {
+      const ref = `.${cls}${el.id ? ' (#' + el.id + ')' : ''}`;
+      ok(`8.2 ${ref} stays display:none when [hidden]`, !classHazard(cls) || globalGuard || classGuard(cls));
+    }
+  }
+}
+
+// ============================================================================
+// 9. player.js PURE helpers. player.js touches AudioContext only inside init()/createPlayer,
+//    never at module top level, so its pure surface is node-importable. Covers the mute/solo
+//    visual-pulse gate (B4) and the resync resume-point that stops a tempo/swing edit from
+//    restarting the loop to the downbeat (B1).
+// ============================================================================
+import { laneAudible, resumeCursor } from './js/player.js';
+{
+  const p2 = normalizePattern({ lanes: [
+    { voice: 'kick', generator: { type: 'euclidean', params: { k: 4, n: 8, rotation: 0 } } },
+    { voice: 'snare', generator: { type: 'euclidean', params: { k: 3, n: 8, rotation: 0 } } },
+  ] });
+  ok('9.1 no mute/solo -> both lanes audible', laneAudible(p2, 0) && laneAudible(p2, 1));
+  const muted = normalizePattern({ ...p2, lanes: p2.lanes.map((l, i) => (i === 1 ? { ...l, mute: true } : l)) });
+  ok('9.2 muted lane not audible', laneAudible(muted, 1) === false);
+  ok('9.3 non-muted lane still audible', laneAudible(muted, 0) === true);
+  const soloed = normalizePattern({ ...p2, lanes: p2.lanes.map((l, i) => (i === 0 ? { ...l, solo: true } : l)) });
+  ok('9.4 soloed lane audible', laneAudible(soloed, 0) === true);
+  ok('9.5 non-soloed lane not audible', laneAudible(soloed, 1) === false);
+  ok('9.6 out-of-range / empty -> not audible', laneAudible(p2, 9) === false && laneAudible({ lanes: [] }, 0) === false);
+
+  // resumeCursor: resume from the first onset at/after the preserved phase (no re-fire, no skip).
+  const fr = [0, 0.25, 0.5, 0.75];
+  eq('9.7 phase 0 resumes at 0', resumeCursor(fr, 0), 0);
+  eq('9.8 mid-bar phase resumes at the next onset', resumeCursor(fr, 0.3), 2);
+  eq('9.9 phase exactly on an onset resumes at it', resumeCursor(fr, 0.5), 2);
+  eq('9.10 phase past all resumes at end (loop wraps next cycle)', resumeCursor(fr, 0.9), 4);
+  eq('9.11 empty schedule -> 0', resumeCursor([], 0.5), 0);
+  eq('9.12 phase normalizes (1.3 == 0.3)', resumeCursor(fr, 1.3), resumeCursor(fr, 0.3));
+  eq('9.13 negative phase normalizes (-0.1 == 0.9)', resumeCursor(fr, -0.1), resumeCursor(fr, 0.9));
 }
 
 // ---- report ----

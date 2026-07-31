@@ -164,6 +164,10 @@ document.getElementById('presetsBtn').addEventListener('click', async () => {
   openPresets(presetsCache);
 });
 function closeOverlay() { overlay.hidden = true; overlay.innerHTML = ''; }
+// Backdrop dismiss: attached ONCE (not per-open, and NOT {once:true}). A delegated {once:true}
+// listener is consumed by the first click ANYWHERE in the overlay subtree, which silently killed
+// click-outside-to-close after any in-panel interaction. This fires only on a real backdrop click.
+overlay.addEventListener('click', (ev) => { if (ev.target === overlay) closeOverlay(); });
 function openPresets(presets) {
   overlay.innerHTML = '';
   const panel = h('div', 'ovpanel');
@@ -184,7 +188,6 @@ function openPresets(presets) {
   }
   overlay.appendChild(panel);
   overlay.hidden = false;
-  overlay.addEventListener('click', (ev) => { if (ev.target === overlay) closeOverlay(); }, { once: true });
 }
 function presetCard(p) {
   const card = h('button', 'ovcard');

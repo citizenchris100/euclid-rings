@@ -136,7 +136,7 @@ export function createRingView(svg, hubEl, handlers = {}) {
     dragLane = lane;
     lastAngle = angleFromEvent(ev);
     accumSteps = 0;
-    svg.setPointerCapture(ev.pointerId);
+    try { svg.setPointerCapture(ev.pointerId); } catch { /* no active pointer (e.g. programmatic) */ }
   });
   svg.addEventListener('pointermove', (ev) => {
     if (dragLane < 0) return;

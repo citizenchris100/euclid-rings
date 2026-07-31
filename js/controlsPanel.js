@@ -62,7 +62,9 @@ function buildStepper(label, get, set, min, max) {
   const wrap = h('div', 'stepper');
   wrap.appendChild(h('span', 'steplabel', label));
   const dec = h('button', 'sbtn', '−');
-  const val = h('span', 'sval', String(get()));
+  // Clamp the DISPLAYED value into [min,max]: accent hits/rotation are stored independent of the
+  // live onset count, so after lowering k the raw get() can exceed the stepper's own max (=onsets).
+  const val = h('span', 'sval', String(clampInt(get(), min(), max())));
   const inc = h('button', 'sbtn', '+');
   const apply = (nv) => { const c = clampInt(nv, min(), max()); val.textContent = String(c); set(c); };
   dec.addEventListener('click', () => apply(get() - 1));

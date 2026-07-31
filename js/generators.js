@@ -25,7 +25,11 @@ export const REGISTRY = {
   euclidean: ({ k, n, rotation }) => euclidRotated(k, n, rotation),
 };
 
+// A load-time snapshot for enumeration/tests; the CLAMP/VALIDATE gates below consult the LIVE
+// REGISTRY (isKnownType) instead, so a type registered at runtime through the seam is honoured
+// rather than silently coerced to euclidean.
 export const GENERATOR_TYPES = Object.keys(REGISTRY);
+const isKnownType = (t) => Object.prototype.hasOwnProperty.call(REGISTRY, t);
 
 // defaultGenerator() -> a musically neutral starting generator (four-on-the-floor over 8).
 export function defaultGenerator() {
@@ -36,7 +40,7 @@ export function defaultGenerator() {
 // Euclidean: n in [2,32], k in [0,n], rotation in [0,n-1].
 export function clampGenerator(gen) {
   const g = gen || {};
-  if (g.type === 'euclidean' || !GENERATOR_TYPES.includes(g.type)) {
+  if (g.type === 'euclidean' || !isKnownType(g.type)) {
     const p = g.params || {};
     const n = clampInt(p.n, MIN_STEPS, MAX_STEPS, 8);
     const k = clampInt(p.k, 0, n, Math.min(4, n));
@@ -51,7 +55,7 @@ export function clampGenerator(gen) {
 export function validateGenerator(gen) {
   const errors = [];
   const g = gen || {};
-  if (!GENERATOR_TYPES.includes(g.type)) errors.push(`unknown generator type: ${g.type}`);
+  if (!isKnownType(g.type)) errors.push(`unknown generator type: ${g.type}`);
   else if (g.type === 'euclidean') {
     const p = g.params || {};
     if (!Number.isInteger(p.n) || p.n < MIN_STEPS || p.n > MAX_STEPS) errors.push('n must be an integer in [2,32]');

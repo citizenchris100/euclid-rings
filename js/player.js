@@ -19,6 +19,25 @@ const LOOKAHEAD_MS = 25;
 const SCHEDULE_AHEAD = 0.12;
 const LEAD = 0.06;
 
+// laneAudible(pattern, i) -> is lane i actually producing sound (not muted, not solo-excluded)?
+// The onset visual pulse is gated by this so a silenced lane's dots don't keep flashing.
+export function laneAudible(pattern, i) {
+  const lanes = (pattern && pattern.lanes) || [];
+  const lane = lanes[i];
+  if (!lane || lane.mute) return false;
+  return soloActive(lanes)[i];
+}
+
+// resumeCursor(fracs, phase) -> index of the first onset at/after `phase`: the point to resume from
+// after a phase-preserving resync, so a tempo/swing/meter change while playing neither re-fires an
+// onset already played this revolution nor skips one. Pure + node-testable (the core of the resync).
+export function resumeCursor(fracs, phase) {
+  const ph = ((phase % 1) + 1) % 1;
+  let i = 0;
+  while (i < fracs.length && fracs[i] < ph) i++;
+  return i;
+}
+
 export function createPlayer() {
   let ctx = null, buffers = {}, master = null;
   const laneGains = [];
@@ -58,13 +77,27 @@ export function createPlayer() {
     }
   }
 
-  // Rebuild the schedule (positions changed). Restart the seam if playing.
+  // Rebuild the schedule (positions/tempo/swing changed). While playing, RESYNC to the current phase
+  // instead of restart()ing to the downbeat, so dragging BPM/Swing advances the loop smoothly rather
+  // than machine-gunning the downbeat every input event (restart() is only for a fresh play()).
   function setPattern(p) {
+    const prevPhase = running ? getCyclePhase() : 0;   // capture with the OLD cyc/startAt
     pattern = p;
     schedule = patternSchedule(p);
     cyc = Math.max(0.05, cycleSeconds(p));
     updateMix(p);
-    if (running) restart();
+    if (running) resyncTo(prevPhase);
+  }
+
+  // Rebase the transport so `now` maps to `phase` under the new cyc/schedule, resuming from the next
+  // onset due this revolution. Preserves continuity across a tempo/swing/meter change while playing.
+  function resyncTo(phase) {
+    if (timer) { clearTimeout(timer); timer = null; }
+    const ph = ((phase % 1) + 1) % 1;
+    startAt = ctx.currentTime - ph * cyc;
+    cycleIndex = 0;
+    cursor = resumeCursor(schedule.map((e) => e.frac), ph);
+    loop();
   }
 
   function scheduleHit(e, when) {
@@ -80,7 +113,7 @@ export function createPlayer() {
       g.connect(laneGains[e.laneIndex] || master);
       src.start(when);
     }
-    if (onFire) {
+    if (onFire && laneAudible(pattern, e.laneIndex)) {
       const delayMs = Math.max(0, (when - ctx.currentTime) * 1000);
       setTimeout(() => { if (running) onFire(e.laneIndex, e.ringIndex); }, delayMs);
     }

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Euclid Rings — browser test harness</title>
+<!-- base = server root so modules import from /js and presetStore's relative fetch('./presets/...') resolves -->
+<base href="/">
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="styles.css">
+<style>
+  body { padding: 16px; }
+  #summary { font: 16px/1.4 system-ui, sans-serif; padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; }
+  #summary.pass { background: #10240f; color: #79e07a; border: 1px solid #2f7d2f; }
+  #summary.fail { background: #2a0f10; color: #ff8a8a; border: 1px solid #7d2f2f; }
+  #log { font: 12px/1.5 ui-monospace, monospace; white-space: pre-wrap; }
+  #log .ok { color: #4caf50; }
+  #log .bad { color: #ff6b6b; }
+  /* sandboxes the harness mounts modules into; off-screen but laid out (ringView needs a real rect) */
+  #mount { position: fixed; left: -3000px; top: 0; width: 800px; }
+  #mount .stage-svg { width: 400px; height: 400px; display: block; }
+</style>
+</head>
+<body>
+  <h1>Euclid Rings — browser harness</h1>
+  <div id="summary">running…</div>
+  <div id="log"></div>
+  <div id="mount"></div>
+  <script type="module" src="/tests/browser.test.js"></script>
+</body>
+</html>

@@ -9,7 +9,7 @@
 
 import { SESSION_PPQ, writeSMF } from './smf.js';
 import { TIME_SIGS } from './engine/clickModel.js';
-import { patternSchedule, cycleTicks } from './patternModel.js';
+import { patternSchedule, cycleTicks, cycleSeconds } from './patternModel.js';
 import { soloActive } from './laneModel.js';
 
 export const EXPORT_NOTE = {
@@ -55,14 +55,20 @@ export function patternToEvents(p) {
 }
 
 // exportSpec(p) -> the writeSMF spec (tempo + meter meta, one-bar endTick).
+// The MIDI tempo is DERIVED from the actual played bar length so the exported .mid plays back at
+// exactly the app's tempo for EVERY meter. barSeconds treats bpm as the per-beat pulse (a 6/8 bar =
+// 6 eighths) while the bar spans (beats*4/den) quarters of ticks; a fixed 60e6/bpm would make every
+// /8 meter export at half its played length. secondsPerQuarter = playedBarSeconds / (ticks/ppq).
 export function exportSpec(p) {
   const m = TIME_SIGS[p.timeSigIndex] || TIME_SIGS[0];
+  const ticks = cycleTicks(p);
+  const tempoUsPerQuarter = Math.round((1e6 * cycleSeconds(p) * SESSION_PPQ) / ticks);
   return {
     ppq: SESSION_PPQ,
-    tempoUsPerQuarter: Math.round(60000000 / p.bpm),
+    tempoUsPerQuarter,
     timeSig: { numerator: m.beats, denominator: m.den || 4 },
     events: patternToEvents(p),
-    endTick: cycleTicks(p),
+    endTick: ticks,
   };
 }
 
